@@ -1,0 +1,59 @@
+﻿@model Models.Media
+
+@if (Model != null)
+{
+    int connectedId = Models.User.ConnectedUser.Id;
+    bool isVisible = Model.Shared || Models.User.ConnectedUser.IsAdmin || Model.OwnerId == connectedId;
+
+    if (isVisible)
+    {
+        <dl>
+            <dd>
+                @if ((Models.User.ConnectedUser.Id == Model.OwnerId || Models.User.ConnectedUser.IsAdmin) && Model.Shared)
+                {
+                    <span style="color:grey">[Partagé]</span>
+                }
+            </dd>
+            <dd>
+                @Model.Title
+            </dd>
+            <dd>
+                @Helper.YoutubePlayer(Model.YoutubeId)
+            </dd>
+            <dd class="description">
+                @Model.Description
+            </dd>
+            <dt>
+                Catégorie
+            </dt>
+
+            <dd>
+                @Model.Category
+            </dd>
+
+            <dt>
+                Date de publication
+            </dt>
+
+            <dd>
+                @Helper.When(Model.PublishDate)
+            </dd>
+            <dt>
+                Ajouté par
+            </dt>
+
+            <dd class="owner" ownerid="@Model.OwnerId">
+                @Helper.AvatarUser(Model.Owner)
+            </dd>
+
+        </dl>
+    }
+    else
+    {
+        <h2 style="color:red">Cette vidéo n'est plus partagée...</h2>
+    }
+}
+else
+{
+    <h2 style="color:red">Cette vidéo a été effacée...</h2>
+}
