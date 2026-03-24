@@ -26,7 +26,7 @@
                     "/Medias/GetMediasCategoriesList",
                     -1 /* manually refreshed */,
                     categoriesSelectPostRefresh);
-
+            let usersSelectAutoRefreshPanel = new AutoRefreshedPanel("userSelectPanel", "/Medias/GetMediasUsersList", -1, usersSelectPostRefresh);
             let keywordsOnchangeTimer = null;
 
             $("#searchInput").on('keyup', function () {
@@ -48,6 +48,7 @@
             });
             function mediasListPostRefresh() {
                 categoriesSelectAutoRefreshPanel.refresh(true);
+                usersSelectAutoRefreshPanel.refresh(true); 
                 $(".mediaThumbnail").off();
                 $(".mediaThumbnail").on("click", function () {
                     let scrollPanel = $("#mainContentPanel");
@@ -73,6 +74,14 @@
                 });
                 $("#categorySelect").on('change', function () {
                     window.location = "/Medias/SetSearchCategory?value=" + $("#categorySelect").val();
+                });
+            }
+            function usersSelectPostRefresh() {
+                $("#userSelect").off();
+                $("#userSelect").on("focus", function () { mediasListAutoRefreshPanel.pause(); });
+                $("#userSelect").on("blur", function () { mediasListAutoRefreshPanel.restart(); });
+                $("#userSelect").on('change', function () {
+                    window.location = "/Medias/SetSearchUser?value=" + $("#userSelect").val();
                 });
             }
         })

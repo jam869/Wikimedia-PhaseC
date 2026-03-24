@@ -1,0 +1,12 @@
+@model IEnumerable<Models.User>
+<select id="userSelect" class="form-control" style="cursor: pointer;">
+    <option value="0" @((int)Session["SelectedUser"] == 0 ? "selected" : "")>Tous les usagers</option>
+    @if (Model != null)
+    {
+        foreach (var user in Model)
+        {
+            string selected = (int)Session["SelectedUser"] == user.Id ? "selected" : "";
+            <option value="@user.Id" @selected>@user.Name</option>
+        }
+    }
+</select>

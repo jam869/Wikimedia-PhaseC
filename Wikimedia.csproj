@@ -122,9 +122,15 @@
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
+    <Compile Include="Models\Comment.cs" />
+    <Compile Include="Models\CommentLike.cs" />
+    <Compile Include="Models\CommentLikesRepository.cs" />
+    <Compile Include="Models\CommentsRepository.cs" />
     <Compile Include="Models\EmailView.cs" />
     <Compile Include="Models\Event.cs" />
     <Compile Include="Models\EventsRepository.cs" />
+    <Compile Include="Models\Like.cs" />
+    <Compile Include="Models\LikesRepository.cs" />
     <Compile Include="Models\Login.cs" />
     <Compile Include="Models\LoginCredential.cs" />
     <Compile Include="Models\LoginsRepository.cs" />
@@ -140,14 +146,11 @@
     <Compile Include="WebServices\GeoLocation.cs" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="App_Assets\Users\13070465-e361-4d69-9073-06ebeb3c64ad.jpeg" />
     <Content Include="App_Assets\Users\156ab756-729a-4dc9-ae1d-cdda8ccfd00d.jpeg" />
     <Content Include="App_Assets\Users\32705cf0-2e95-4362-bce7-7d77cb8d4b84.jpeg" />
-    <Content Include="App_Assets\Users\3b8cc315-9869-4eeb-acb0-9f539b33758a.jpeg" />
     <Content Include="App_Assets\Users\3b8cc315-9869-4eeb-acb0-9f539b33758aX.jpeg" />
     <Content Include="App_Assets\Users\42c2ab89-8bff-457f-9592-0e2321b08511.jpeg" />
     <Content Include="App_Assets\Users\5aa8957d-e980-4cac-b915-aaa63d0909f1.jpeg" />
-    <Content Include="App_Assets\Users\67e02a94-2b82-4d76-8396-9cac4db7308d.png" />
     <Content Include="App_Assets\Users\8b12ca6f-f732-440c-b7db-ccb07e1fdcae.png" />
     <Content Include="App_Assets\Users\a85fbd9a-5340-4053-a4c5-c7d491df7afe.jpeg" />
     <Content Include="App_Assets\Users\no_avatar.png" />
@@ -233,6 +236,8 @@
     <Content Include="Views\Accounts\RenewPassword.cshtml" />
     <Content Include="Views\Accounts\RenewPasswordCommand.cshtml" />
     <Content Include="Views\Accounts\Subscribe.cshtml" />
+    <None Include="Properties\PublishProfiles\Wikimedia-202339996 - Web Deploy.pubxml" />
+    <Content Include="Views\Medias\GetMediasUsersList.cshtml" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

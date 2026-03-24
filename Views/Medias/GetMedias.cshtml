@@ -8,30 +8,60 @@
         {
             bool writeAccess = Models.User.ConnectedUser.IsAdmin || media.OwnerId == connectedId;
 
-            <div class="mediaLayout">
-                <a href="/Medias/Details/@media.Id" title="Voir les détails de @media.Title" style="text-decoration:none; width:100% !important">
-                    <div class="mediaThumbnail"
-                         style="background-image:url('https://img.youtube.com/vi/@media.YoutubeId/mqdefault.jpg'); padding:6px; display:flex; flex-flow:row-reverse ">
-                        <div class="UserSmallAvatar transparentBackground"
-                             style="background-image: url('@media.Owner.Avatar'); border:0.1px solid white;"
-                             title="Ajouté par @media.Owner.Name"></div>
-                        @if (writeAccess && media.Shared)
-                        {
-                            <div class="UserSmallAvatar transparentBackground" style="background-image: url('/Content/UI-Images/shared.png'); margin-right:6px;" title="partagée"></div>
-                        }
-                    </div>
-                </a>
-
-                <div class="ellipsis" style="margin-left: 4px; margin-right: 4px; font-size: 0.8em; font-weight: bold">
-                    @media.Title
-                </div>
-                <div style="display: grid; grid-template-columns: auto 120px; align-items: last baseline ">
-
-                    <div style="margin-left: 4px; color: gray; font-size: 0.65em">@media.Category  @Helper.When(media.PublishDate) </div>
-
-                   
-                </div>
+    <div class="mediaLayout">
+        <a href="/Medias/Details/@media.Id" title="Voir les détails de @media.Title" style="text-decoration:none; width:100% !important">
+            <div class="mediaThumbnail"
+                 style="background-image:url('https://img.youtube.com/vi/@media.YoutubeId/mqdefault.jpg'); padding:6px; display:flex; flex-flow:row-reverse ">
+                <div class="UserSmallAvatar transparentBackground"
+                     style="background-image: url('@media.Owner.Avatar'); border:0.1px solid white;"
+                     title="Ajouté par @media.Owner.Name"></div>
+                @if (writeAccess && media.Shared)
+                {
+                    <div class="UserSmallAvatar transparentBackground" style="background-image: url('/Content/UI-Images/shared.png'); margin-right:6px;" title="partagée"></div>
+                }
             </div>
+        </a>
+
+        <div class="ellipsis" style="margin-left: 4px; margin-right: 4px; font-size: 0.8em; font-weight: bold">
+            @media.Title
+        </div>
+        <div style="display: grid; grid-template-columns: auto 120px; align-items: last baseline ">
+            <div style="margin-left: 4px; color: gray; font-size: 0.65em">@media.Category  @Helper.When(media.PublishDate) </div>
+
+            @{
+                var likes = DAL.DB.Likes.ToList().Where(l => l.MediaId == media.Id).ToList();
+                int commentsCount = DAL.DB.Comments.ToList().Count(c => c.MediaId == media.Id);
+                bool userLiked = likes.Any(l => l.UserId == connectedId);
+                string thumbIcon = userLiked ? "fa-solid fa-thumbs-up" : "fa-regular fa-thumbs-up";
+                string likedBy = string.Join("\n", likes.Select(l => DAL.DB.Users.Get(l.UserId).Name));
+            }
+            <div style="text-align: right; margin-right: 4px; display:flex; justify-content:flex-end; align-items:center; gap: 10px;">
+                <span style="font-size: 0.9em; font-weight:bold; color:gray;">
+                    @commentsCount <i class="fa-solid fa-comment" style="margin-left:2px;"></i>
+                </span>
+
+                <span title="@likedBy" class="like-count" style="cursor:help; font-size: 0.9em; font-weight:bold;">@likes.Count</span>
+                <i class="@thumbIcon like-btn" style="color: #0d6efd; cursor: pointer; font-size: 1.2em;" onclick="toggleMediaLikeFast(@media.Id, this)"></i>
+            </div>
+        </div>
+
+        <script>
+            function toggleMediaLikeFast(mediaId, btn) {
+                let $icon = $(btn);
+                let $countSpan = $icon.prev('.like-count');
+                let count = parseInt($countSpan.text());
+
+                if ($icon.hasClass('fa-regular')) {
+                    $icon.removeClass('fa-regular').addClass('fa-solid');
+                    $countSpan.text(count + 1);
+                } else {
+                    $icon.removeClass('fa-solid').addClass('fa-regular'); 
+                    $countSpan.text(count - 1);
+                }                $.get('/Medias/ToggleLike?mediaId=' + mediaId);
+            }
+        </script>
+    </div>
+          
         }
     }
     else

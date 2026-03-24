@@ -25,6 +25,7 @@ public class MediasController : Controller
         if (Session["SortByTitle"] == null) Session["SortByTitle"] = true;
         if (Session["MediaSortBy"] == null) Session["MediaSortBy"] = MediaSortBy.PublishDate;
         if (Session["SortAscending"] == null) Session["SortAscending"] = false;
+        if (Session["SelectedUser"] == null) Session["SelectedUser"] = 0; 
         ValidateSelectedCategory();
     }
 
@@ -71,12 +72,12 @@ public class MediasController : Controller
         try
         {
             InitSessionVariables();
-
-            int mediaId = (int)Session["CurrentMediaId"];
+            int mediaId = Session["CurrentMediaId"] != null ? (int)Session["CurrentMediaId"] : 0;
             Media Media = DB.Medias.Get(mediaId);
-            if (DB.Users.HasChanged || DB.Medias.HasChanged || forceRefresh)
+
+            if (DB.Users.HasChanged || DB.Medias.HasChanged || DB.Likes.HasChanged || DB.Comments.HasChanged || forceRefresh)
             {
-                return PartialView(Media);
+                return PartialView("GetMediaDetails", Media);
             }
             return null;
         }
@@ -90,54 +91,51 @@ public class MediasController : Controller
         try
         {
             IEnumerable<Media> result = null;
-            // Must evaluate HasChanged before forceRefresh, this will fix an usefull refresh
-            if (DB.Users.HasChanged || DB.Medias.HasChanged || forceRefresh)
+            if (DB.Users.HasChanged || DB.Medias.HasChanged || DB.Likes.HasChanged || DB.Comments.HasChanged || forceRefresh)
             {
                 InitSessionVariables();
                 bool search = (bool)Session["Search"];
                 string searchString = (string)Session["SearchString"];
 
-                if (Models.User.ConnectedUser.IsAdmin)
-                    result = DB.Medias.ToList();
-                else
-                    result = DB.Medias.ToList().Where(c => c.Shared || Models.User.ConnectedUser.Id == c.OwnerId);
+                if (Models.User.ConnectedUser.IsAdmin) result = DB.Medias.ToList();
+                else result = DB.Medias.ToList().Where(c => c.Shared || Models.User.ConnectedUser.Id == c.OwnerId);
 
                 if (search)
                 {
                     result = result.Where(c => c.Title.ToLower().Contains(searchString)).OrderBy(c => c.Title);
+
                     string SelectedCategory = (string)Session["SelectedCategory"];
-                    if (SelectedCategory != "")
-                        result = result.Where(c => c.Category == SelectedCategory);
+                    if (SelectedCategory != "") result = result.Where(c => c.Category == SelectedCategory);
+
+                    int selectedUser = (int)Session["SelectedUser"];
+                    if (selectedUser != 0) result = result.Where(c => c.OwnerId == selectedUser);
                 }
 
                 if ((bool)Session["SortAscending"])
                 {
                     switch ((MediaSortBy)Session["MediaSortBy"])
                     {
-                        case MediaSortBy.Title:
-                            result = result.OrderBy(c => c.Title); break;
-                        case MediaSortBy.PublishDate:
-                            result = result.OrderBy(c => c.PublishDate); break;
+                        case MediaSortBy.Title: result = result.OrderBy(c => c.Title); break;
+                        case MediaSortBy.PublishDate: result = result.OrderBy(c => c.PublishDate); break;
+                        case MediaSortBy.Likes: result = result.OrderBy(c => DB.Likes.ToList().Count(l => l.MediaId == c.Id)); break;
+                        case MediaSortBy.Comments: result = result.OrderBy(c => DB.Comments.ToList().Count(com => com.MediaId == c.Id)); break;
                     }
                 }
                 else
                 {
                     switch ((MediaSortBy)Session["MediaSortBy"])
                     {
-                        case MediaSortBy.Title:
-                            result = result.OrderByDescending(c => c.Title); break;
-                        case MediaSortBy.PublishDate:
-                            result = result.OrderByDescending(c => c.PublishDate); break;
+                        case MediaSortBy.Title: result = result.OrderByDescending(c => c.Title); break;
+                        case MediaSortBy.PublishDate: result = result.OrderByDescending(c => c.PublishDate); break;
+                        case MediaSortBy.Likes: result = result.OrderByDescending(c => DB.Likes.ToList().Count(l => l.MediaId == c.Id)); break;
+                        case MediaSortBy.Comments: result = result.OrderByDescending(c => DB.Comments.ToList().Count(com => com.MediaId == c.Id)); break;
                     }
                 }
                 return PartialView(result);
             }
             return null;
         }
-        catch (System.Exception ex)
-        {
-            return Content("Erreur interne" + ex.Message, "text/html");
-        }
+        catch (System.Exception ex) { return Content("Erreur interne" + ex.Message, "text/html"); }
     }
     public ActionResult List()
     {
@@ -157,9 +155,14 @@ public class MediasController : Controller
     }
     public ActionResult ToggleMediaSort()
     {
-        int mediaSortBy = (int)Session["MediaSortBy"] + 1;
-        if (mediaSortBy >= Enum.GetNames(typeof(MediaSortBy)).Length) mediaSortBy = 0;
-        Session["MediaSortBy"] = mediaSortBy;
+        InitSessionVariables();
+        MediaSortBy currentSort = (MediaSortBy)Session["MediaSortBy"];
+
+        if (currentSort == MediaSortBy.Title) Session["MediaSortBy"] = MediaSortBy.PublishDate;
+        else if (currentSort == MediaSortBy.PublishDate) Session["MediaSortBy"] = MediaSortBy.Likes;
+        else if (currentSort == MediaSortBy.Likes) Session["MediaSortBy"] = MediaSortBy.Comments;
+        else Session["MediaSortBy"] = MediaSortBy.Title;
+
         return RedirectToAction("List");
     }
     public ActionResult ToggleSort()
@@ -272,6 +275,7 @@ public class MediasController : Controller
             {
                 if (Media.OwnerId == Models.User.ConnectedUser.Id || Models.User.ConnectedUser.IsAdmin)
                 {
+                    DB.Likes.DeleteMediaLikes(id);
                     DB.Medias.Delete(id);
                     return RedirectToAction("List");
                 }
@@ -293,4 +297,72 @@ public class MediasController : Controller
                     JsonRequestBehavior.AllowGet /* must have for CORS verification by client browser */);
     }
 
+    [UserAccess(Access.View)]
+    public ActionResult ToggleLike(int mediaId)
+    {
+        int userId = Models.User.ConnectedUser.Id;
+        var existingLike = DB.Likes.ToList().FirstOrDefault(l => l.UserId == userId && l.MediaId == mediaId);
+        if (existingLike != null) DB.Likes.Delete(existingLike.Id);
+        else DB.Likes.Add(new Like { UserId = userId, MediaId = mediaId });
+        return null;
+    }
+
+    [HttpPost]
+    [UserAccess(Access.View)]
+    public ActionResult AddComment(int mediaId, string text, int parentId = 0)
+    {
+        DB.Comments.Add(new Comment { MediaId = mediaId, UserId = Models.User.ConnectedUser.Id, Text = text, CreationDate = DateTime.Now, ParentId = parentId });
+        return null;
+    }
+
+    [HttpPost]
+    [UserAccess(Access.View)]
+    public ActionResult EditComment(int id, string text)
+    {
+        var comment = DB.Comments.Get(id);
+        if (comment != null && (comment.UserId == Models.User.ConnectedUser.Id || Models.User.ConnectedUser.IsAdmin))
+        {
+            comment.Text = text;
+            DB.Comments.Update(comment);
+        }
+        return null;
+    }
+
+    [UserAccess(Access.View)]
+    public ActionResult DeleteComment(int id)
+    {
+        var comment = DB.Comments.Get(id);
+        if (comment != null && (comment.UserId == Models.User.ConnectedUser.Id || Models.User.ConnectedUser.IsAdmin))
+        {
+            DB.CommentLikes.DeleteCommentLikes(id);
+            var replies = DB.Comments.ToList().Where(c => c.ParentId == id).ToList();
+            foreach (var reply in replies) { DB.CommentLikes.DeleteCommentLikes(reply.Id); DB.Comments.Delete(reply.Id); }
+            DB.Comments.Delete(id);
+        }
+        return null;
+    }
+
+    [UserAccess(Access.View)]
+    public ActionResult ToggleCommentLike(int commentId)
+    {
+        int userId = Models.User.ConnectedUser.Id;
+        var existing = DB.CommentLikes.ToList().FirstOrDefault(l => l.UserId == userId && l.CommentId == commentId);
+        if (existing != null) DB.CommentLikes.Delete(existing.Id);
+        else DB.CommentLikes.Add(new CommentLike { UserId = userId, CommentId = commentId });
+        return null;
+    }
+
+    public ActionResult GetMediasUsersList()
+    {
+        InitSessionVariables();
+        var userIds = DB.Medias.ToList().Select(m => m.OwnerId).Distinct();
+        var users = DB.Users.ToList().Where(u => userIds.Contains(u.Id)).OrderBy(u => u.Name).ToList();
+        return PartialView(users);
+    }
+
+    public ActionResult SetSearchUser(int value)
+    {
+        Session["SelectedUser"] = value;
+        return RedirectToAction("List");
+    }
 }

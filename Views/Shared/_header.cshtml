@@ -23,6 +23,8 @@
     {
         case MediaSortBy.Title: iconSortBy = "fa-solid fa-t"; iconSortByTitle = "Tri des vidéos par titre"; break;
         case MediaSortBy.PublishDate: iconSortBy = "fa-regular fa-calendar"; iconSortByTitle = "Tri des vidéos par date de publication"; break;
+        case MediaSortBy.Likes: iconSortBy = "fa-solid fa-thumbs-up"; iconSortByTitle = "Tri des vidéos par j'aime"; break;
+        case MediaSortBy.Comments: iconSortBy = "fa-solid fa-comment"; iconSortByTitle = "Tri des vidéos par commentaires"; break;
     }
 
     bool userConnected = Models.User.ConnectedUser != null;
@@ -124,6 +126,15 @@
                                 <i class="menuIcon fa @checkSortByTitle"></i>
                                 <a href="/Medias/SetMediaSortBy?mediaSortBy=@MediaSortBy.Title">Trier par titre</a>
                             </div>
+                            <div class="dropdown-item item-layout">
+                                <i class="menuIcon fa @(mediaSortBy == Models.MediaSortBy.Likes ? "fa-check" : "")"></i>
+                                <a href="/Medias/SetMediaSortBy?mediaSortBy=@Models.MediaSortBy.Likes">Trier par j'aime</a>
+                            </div>
+
+                            <div class="dropdown-item item-layout">
+                                <i class="menuIcon fa @(mediaSortBy == Models.MediaSortBy.Comments ? "fa-check" : "")"></i>
+                                <a href="/Medias/SetMediaSortBy?mediaSortBy=@Models.MediaSortBy.Comments">Trier par commentaires</a>
+                            </div>
 
                             <div class="dropdown-divider"></div>
 
@@ -183,8 +194,10 @@
     <div class="flex">
         <input type="search" id="searchInput" class="section roundedBorder flexItem" value="@searchString" placeholder="Recherche...">
         <div id="categorySelectPanel" class="flexItem">
-            <!-- Dynamically refreshed -->
             @{ Html.RenderPartial("GetMediasCategoriesList"); }
+        </div>
+        <div id="userSelectPanel" class="flexItem" style="margin-left:5px;">
+            @{ Html.RenderPartial("GetMediasUsersList"); }
         </div>
     </div>
 }
