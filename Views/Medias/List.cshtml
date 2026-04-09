@@ -1,80 +1,141 @@
 ﻿@{ ViewBag.PageTitle = "Wikimedia"; }
 
-<!--
-    The content of this view rely on the one produced
-    by the /Contacts/GetContacts action that call
-    Views/Contacts/GetContacts.cshtml partial view
--->
-
 <div id="MediaListPanel" class="mediaListLayout">
-    <!-- Periodicaly refreshed by object contactListPanel of class AutoRefreshedPanel -->
 </div>
 
 @section Scripts {
     <script>
-        $(() => {
-            let mediasListAutoRefreshPanel =
-                new AutoRefreshedPanel(
-                    "MediaListPanel",
-                    "/Medias/GetMedias",
-                    5,
-                    mediasListPostRefresh);
+        let mediasListAutoRefreshPanel = null;
+        let categoriesSelectAutoRefreshPanel = null;
+        let usersSelectAutoRefreshPanel = null;
+        let pauseScrollEvent = false;
+        let loadMoreTriggerMargin = 10;
 
-            let categoriesSelectAutoRefreshPanel =
-                new AutoRefreshedPanel(
-                    "categorySelectPanel",
-                    "/Medias/GetMediasCategoriesList",
-                    -1 /* manually refreshed */,
-                    categoriesSelectPostRefresh);
+        $(() => {
+            setCurrentPageLimit(); // Initialize first page size
+
+            mediasListAutoRefreshPanel = new AutoRefreshedPanel(
+                "MediaListPanel",
+                "/Medias/GetMedias",
+                5,
+                mediasListPostRefresh);
+
+            categoriesSelectAutoRefreshPanel = new AutoRefreshedPanel(
+                "categorySelectPanel",
+                "/Medias/GetMediasCategoriesList",
+                -1,
+                categoriesSelectPostRefresh);
+
+            usersSelectAutoRefreshPanel = new AutoRefreshedPanel(
+                "userSelectPanel",
+                "/Medias/GetMediasUsersList",
+                -1,
+                usersSelectPostRefresh);
+
+            // Gestion du Scroll Infini (Phase B)
+            $("#mainContentPanel").scroll(function () {
+                let scrollPanel = $(this);
+                if (!pauseScrollEvent) {
+                    if ((scrollPanel.scrollTop() + scrollPanel.outerHeight() >= $("#MediaListPanel").outerHeight() - loadMoreTriggerMargin)) {
+                        pauseScrollEvent = true;
+                        $.ajax({
+                            url: "/Medias/getNextMediasPage",
+                            success: function (html) {
+                                if (html != "") {
+                                    $("#MediaListPanel").append(html);
+                                    pauseScrollEvent = false;
+                                    mediasListPostRefresh(); // Attache les clics et met en surbrillance
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+
+            // Redimensionnement dynamique pour ajuster le nb d'items (Phase B)
+            let resizeTimer = null;
+            let resizeEndTriggerDelai = 300;
+            $(window).on('resize', function (e) {
+                mediasListAutoRefreshPanel.pause();
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    setCurrentPageLimit();
+                    mediasListAutoRefreshPanel.restart();
+                    mediasListAutoRefreshPanel.refresh(true);
+                }, resizeEndTriggerDelai);
+            });
 
             let keywordsOnchangeTimer = null;
-
             $("#searchInput").on('keyup', function () {
                 clearTimeout(keywordsOnchangeTimer);
-                /* delay request by 0.5 seconds */
                 keywordsOnchangeTimer = setTimeout(() => {
                     window.location = "/Medias/SetSearchString?value=" + $("#searchInput").val();
-                }, 1000 /* 1 seconds */);
+                }, 1000);
             });
-            $("#searchInput").on('search', function () { /* click on clear */
+            $("#searchInput").on('search', function () {
                 clearTimeout(keywordsOnchangeTimer);
                 window.location = "/Medias/SetSearchString?value=" + $("#searchInput").val();
             });
-            $("#searchInput").on("focus", function () {
-                mediasListAutoRefreshPanel.pause();
-            });
-            $("#searchInput").on("blur", function () {
-                mediasListAutoRefreshPanel.restart();
-            });
-            function mediasListPostRefresh() {
-                categoriesSelectAutoRefreshPanel.refresh(true);
-                $(".mediaThumbnail").off();
-                $(".mediaThumbnail").on("click", function () {
-                    let scrollPanel = $("#mainContentPanel");
-                    sessionStorage.setItem("previousScrollPosition", scrollPanel.scrollTop());
-                })
-                let scrollPanel = $("#mainContentPanel");
-                let scrollPos = sessionStorage.getItem("previousScrollPosition");
-                let wasInDetails = sessionStorage.getItem("WasInDetails");
-                // Restore scroll position
-                if (wasInDetails != null && scrollPos != null) {
-                    scrollPanel.scrollTop(parseInt(scrollPos));
-                }
-                sessionStorage.clear("WasInDetails");
-            }
-            function categoriesSelectPostRefresh() {
+            $("#searchInput").on("focus", function () { mediasListAutoRefreshPanel.pause(); });
+            $("#searchInput").on("blur", function () { mediasListAutoRefreshPanel.restart(); });
+        });
 
-                $("#categorySelect").off();
-                $("#categorySelect").on("focus", function () {
-                    mediasListAutoRefreshPanel.pause();
-                });
-                $("#categorySelect").on("blur", function () {
-                    mediasListAutoRefreshPanel.restart();
-                });
-                $("#categorySelect").on('change', function () {
-                    window.location = "/Medias/SetSearchCategory?value=" + $("#categorySelect").val();
-                });
+        function setCurrentPageLimit() {
+            let nbColumns = 3;
+            let mediaDefaultOuterHeight = 240;
+            let mediaLayout = $(".mediaLayout").first();
+            if (mediaLayout != null && mediaLayout.outerHeight() != undefined) {
+                mediaDefaultOuterHeight = mediaLayout.outerHeight();
             }
-        })
+            let nbRows = Math.round($("#mainContentPanel").innerHeight() / mediaDefaultOuterHeight);
+            let pageSize = nbRows * nbColumns + nbColumns;
+            $.ajax({ url: `/Medias/SetFirstPageSize?pageSize=${pageSize}` });
+        }
+
+        function mediasListPostRefresh() {
+            categoriesSelectAutoRefreshPanel.refresh(true);
+            usersSelectAutoRefreshPanel.refresh(true);
+            $(".mediaThumbnail").off();
+            $(".mediaThumbnail").on("click", function () {
+                let scrollPanel = $("#mainContentPanel");
+                sessionStorage.setItem("previousScrollPosition", scrollPanel.scrollTop());
+            })
+            let scrollPanel = $("#mainContentPanel");
+            let scrollPos = sessionStorage.getItem("previousScrollPosition");
+            let wasInDetails = sessionStorage.getItem("WasInDetails");
+            if (wasInDetails != null && scrollPos != null) {
+                scrollPanel.scrollTop(parseInt(scrollPos));
+            }
+            sessionStorage.clear("WasInDetails");
+
+            // Appel de la surbrillance (Phase B)
+            highlightKeyword();
+        }
+
+        function highlightKeyword() {
+            let searchInput = $("#searchInput").val();
+            let minKeywordLenth = 3;
+            if (searchInput != undefined && searchInput.length >= minKeywordLenth) {
+                $(".mediaTitle").each(function () { highlight(searchInput, this); });
+                $(".mediaDescription").each(function () { highlight(searchInput, this); });
+            }
+        }
+
+        function categoriesSelectPostRefresh() {
+            $("#categorySelect").off();
+            $("#categorySelect").on("focus", function () { mediasListAutoRefreshPanel.pause(); });
+            $("#categorySelect").on("blur", function () { mediasListAutoRefreshPanel.restart(); });
+            $("#categorySelect").on('change', function () {
+                window.location = "/Medias/SetSearchCategory?value=" + $("#categorySelect").val();
+            });
+        }
+        function usersSelectPostRefresh() {
+            $("#userSelect").off();
+            $("#userSelect").on("focus", function () { mediasListAutoRefreshPanel.pause(); });
+            $("#userSelect").on("blur", function () { mediasListAutoRefreshPanel.restart(); });
+            $("#userSelect").on('change', function () {
+                window.location = "/Medias/SetSearchUser?value=" + $("#userSelect").val();
+            });
+        }
     </script>
 }

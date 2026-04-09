@@ -119,4 +119,12 @@ function ajaxActionCall(actionLink) {
         }
     });
 }
+function highlight(text, elem) {
+    let innerHTML = elem.innerHTML;
+    let index = innerHTML.toLowerCase().indexOf(text.toLowerCase());
+    if (index >= 0) {
+        innerHTML = innerHTML.substring(0, index) + "<span class='highlight'>" + innerHTML.substring(index, index + text.length) + "</span>" + innerHTML.substring(index + text.length);
+        elem.innerHTML = innerHTML;
+    }
+}
 

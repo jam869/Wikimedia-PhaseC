@@ -1,41 +1,56 @@
 ﻿@model IEnumerable<Models.Media>
 
-@{
-    if (Model.Count() != 0)
+@if (Model.Count() != 0)
+{
+    foreach (var media in Model)
     {
-        int connectedId = Models.User.ConnectedUser.Id;
-        foreach (var media in Model)
-        {
-            bool writeAccess = Models.User.ConnectedUser.IsAdmin || media.OwnerId == connectedId;
+        Models.User currentUser = Models.User.ConnectedUser;
+        int connectedId = currentUser != null ? currentUser.Id : 0;
 
-            <div class="mediaLayout">
-                <a href="/Medias/Details/@media.Id" title="Voir les détails de @media.Title" style="text-decoration:none; width:100% !important">
-                    <div class="mediaThumbnail"
-                         style="background-image:url('https://img.youtube.com/vi/@media.YoutubeId/mqdefault.jpg'); padding:6px; display:flex; flex-flow:row-reverse ">
-                        <div class="UserSmallAvatar transparentBackground"
-                             style="background-image: url('@media.Owner.Avatar'); border:0.1px solid white;"
-                             title="Ajouté par @media.Owner.Name"></div>
-                        @if (writeAccess && media.Shared)
-                        {
-                            <div class="UserSmallAvatar transparentBackground" style="background-image: url('/Content/UI-Images/shared.png'); margin-right:6px;" title="partagée"></div>
-                        }
+        <div class="mediaLayout" style="position: relative;">
+            <a href="/Medias/Details/@media.Id" title="Voir les détails de @media.Title" style="text-decoration:none; width:100% !important">
+                <div class="mediaThumbnail" style="background-image:url('https://img.youtube.com/vi/@media.YoutubeId/mqdefault.jpg'); position: relative;">
+                    <div style="position: absolute; top: 5px; right: 5px;">
+                        <div class="UserSmallAvatar"
+                             style="background-image: url(@media.Owner.Avatar); width: 35px; height: 35px; border-radius: 50%; border: 2px solid white; background-size: cover; background-position: center;"
+                             title="@media.Owner.Name">
+                        </div>
                     </div>
-                </a>
-
-                <div class="ellipsis" style="margin-left: 4px; margin-right: 4px; font-size: 0.8em; font-weight: bold">
-                    @media.Title
+                    @if (currentUser != null && media.OwnerId == currentUser.Id)
+                    {
+                        <div style="position: absolute; top: 5px; left: 5px; background: rgba(255,255,255,0.85); padding: 4px 6px; border-radius: 4px; color: black;">
+                            <i class="fa @(media.Shared ? "fa-share-nodes text-success" : "fa-lock text-warning")"
+                               title="@(media.Shared ? "Partagé publiquement" : "Privé")"></i>
+                        </div>
+                    }
                 </div>
-                <div style="display: grid; grid-template-columns: auto 120px; align-items: last baseline ">
+            </a>
 
-                    <div style="margin-left: 4px; color: gray; font-size: 0.65em">@media.Category  @Helper.When(media.PublishDate) </div>
+            <div class="ellipsis mediaTitle" style="margin-left: 4px; margin-right: 4px; font-size: 0.8em; font-weight: bold">
+                @media.Title
+            </div>
 
-                   
+            <div style="display: grid; grid-template-columns: auto 120px; align-items: last baseline ">
+                <div style="margin-left: 4px; color: gray; font-size: 0.65em">
+                    @media.Category  <span style="color: #3399ff;">@Helper.When(media.PublishDate)</span>
+                </div>
+
+                @{
+                    var likes = DAL.DB.Likes.ToList().Where(l => l.MediaId == media.Id).ToList();
+                    bool userLiked = likes.Any(l => l.UserId == connectedId);
+                    string thumbIcon = userLiked ? "fa-solid fa-thumbs-up" : "fa-regular fa-thumbs-up";
+                    string likedBy = string.Join("\n", likes.Select(l => DAL.DB.Users.Get(l.UserId).Name));
+                }
+
+                <div style="text-align: right; margin-right: 4px; color: #3399ff; font-size: 1.2em;">
+                    <span title="@likedBy" class="like-count" style="cursor:help; font-weight:bold;">@likes.Count</span>
+                    <i class="@thumbIcon like-btn" style="cursor: pointer; margin-left: 5px;" onclick="toggleMediaLikeFast(@media.Id, this); return false;"></i>
                 </div>
             </div>
-        }
+        </div>
     }
-    else
-    {
-        <h3>Aucun résulat</h3>
-    }
+}
+else
+{
+    <h3> Aucun résultat </h3>
 }
