@@ -21,12 +21,19 @@
 
     switch (mediaSortBy)
     {
-        case MediaSortBy.Title: iconSortBy = "fa-solid fa-t"; iconSortByTitle = "Tri des vidéos par titre"; break;
-        case MediaSortBy.PublishDate: iconSortBy = "fa-regular fa-calendar"; iconSortByTitle = "Tri des vidéos par date de publication"; break;
-        case MediaSortBy.Likes: iconSortBy = "fa-solid fa-thumbs-up"; iconSortByTitle = "Tri des vidéos par j'aime"; break;
-        case MediaSortBy.Comments: iconSortBy = "fa-solid fa-comment"; iconSortByTitle = "Tri des vidéos par commentaires"; break;
+        case MediaSortBy.Title:
+            iconSortBy = "fa-solid fa-t";
+            iconSortByTitle = "Tri des vidéos par titre";
+            break;
+        case MediaSortBy.PublishDate:
+            iconSortBy = "fa-regular fa-calendar";
+            iconSortByTitle = "Tri des vidéos par date de publication";
+            break;
+        case MediaSortBy.Likes:
+            iconSortBy = "fa-regular fa-thumbs-up"; 
+            iconSortByTitle = "Tri des vidéos par j'aime";
+            break;
     }
-
     bool userConnected = Models.User.ConnectedUser != null;
     bool userIsAdmin = userConnected ? Models.User.ConnectedUser.IsAdmin : false;
     bool userCanWrite = userConnected ? Models.User.ConnectedUser.CanWrite : false;
@@ -37,8 +44,9 @@
 <div class="section roundedBorder">
     <div class="headerMenu">
         <a class="siteIcon" href="/Medias/list"></a>
-        <div class="pageTitle">@ViewBag.PageTitle</div>
-        <!-- Direct action context command icons -->
+        <div class="pageTitle" style="display:flex; align-items:center;">
+            @ViewBag.PageTitle
+        </div>
         @switch (action)
         {
             case "login": break;
@@ -72,6 +80,16 @@
                     {
                         <a href="/@controller/ToggleSort" id="cmdToggleSearch" class="cmdIcon fa fa-arrow-up-wide-short" title="Tri descendant..."></a>
                     }
+
+
+
+
+
+
+
+
+
+
 
                     <a href="/@controller/ToggleSearch" id="cmdToggleSearch" class="cmdIcon fa fa-search" title="Recherche..."></a>
                     <!-- Dropdown menu -->
@@ -131,11 +149,6 @@
                                 <a href="/Medias/SetMediaSortBy?mediaSortBy=@Models.MediaSortBy.Likes">Trier par j'aime</a>
                             </div>
 
-                            <div class="dropdown-item item-layout">
-                                <i class="menuIcon fa @(mediaSortBy == Models.MediaSortBy.Comments ? "fa-check" : "")"></i>
-                                <a href="/Medias/SetMediaSortBy?mediaSortBy=@Models.MediaSortBy.Comments">Trier par commentaires</a>
-                            </div>
-
                             <div class="dropdown-divider"></div>
 
                             <div class="dropdown-item item-layout">
@@ -156,6 +169,8 @@
                            onclick="bootbox.confirm(`<b style=color:red>Effacer le Media : </b><h3>@currentMediaTitle?</h3>`, function(result){ if (result) window.location = '/@controller/Delete'; })">
                         </i>
                     }
+                    <span id="headerLikesPanel" style="margin-right: 15px; display: inline-flex; align-items: center;"></span>
+
                     <a href="/@controller/List" class="cmdIcon fa fa-square-xmark" title="retour"></a>
                 </div>
                 break;

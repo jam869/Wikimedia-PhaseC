@@ -9,13 +9,8 @@ using static Controllers.AccessControl;
 [UserAccess(Access.View)]
 public class MediasController : Controller
 {
-
     private void InitSessionVariables()
     {
-        // Session is a dictionary that hold keys values specific to a session
-        // Each user of this web application have their own Session
-        // A Session has a default time out of 20 minutes, after time out it is cleared
-
         if (Session["CurrentMediaId"] == null) Session["CurrentMediaId"] = 0;
         if (Session["CurrentMediaTitle"] == null) Session["CurrentMediaTitle"] = "";
         if (Session["Search"] == null) Session["Search"] = false;
@@ -25,8 +20,21 @@ public class MediasController : Controller
         if (Session["SortByTitle"] == null) Session["SortByTitle"] = true;
         if (Session["MediaSortBy"] == null) Session["MediaSortBy"] = MediaSortBy.PublishDate;
         if (Session["SortAscending"] == null) Session["SortAscending"] = false;
-        if (Session["SelectedUser"] == null) Session["SelectedUser"] = 0; 
+        if (Session["SelectedUser"] == null) Session["SelectedUser"] = 0;
+
+        // Paging handling (Phase B)
+        if (Session["pageNum"] == null) Session["pageNum"] = 1;
+        if (Session["firstPageSize"] == null) Session["firstPageSize"] = 12;
+        if (Session["pageSize"] == null) Session["pageSize"] = 3;
+        if (Session["EndOfMedias"] == null) Session["EndOfMedias"] = false;
+
         ValidateSelectedCategory();
+    }
+
+    private void ResetMediasPaging()
+    {
+        Session["pageNum"] = 1;
+        Session["EndOfMedias"] = false;
     }
 
     private void ResetCurrentMediaInfo()
@@ -46,27 +54,117 @@ public class MediasController : Controller
         }
     }
 
+    // Extraction des données avec pagination (Phase B) + Tri par Likes (Phase C)
+    private IEnumerable<Media> _getItems(int index, int nbItems)
+    {
+        InitSessionVariables();
+        bool search = (bool)Session["Search"];
+        string searchString = (string)Session["SearchString"];
+
+        IEnumerable<Media> result = null;
+        if (Models.User.ConnectedUser.IsAdmin) result = DB.Medias.ToList();
+        else result = DB.Medias.ToList().Where(c => c.Shared || Models.User.ConnectedUser.Id == c.OwnerId);
+
+        if (search)
+        {
+            // Surbrillance Phase B : on recherche dans Titre ET Description
+            result = result.Where(c => c.Title.ToLower().Contains(searchString) || c.Description.ToLower().Contains(searchString));
+
+            string SelectedCategory = (string)Session["SelectedCategory"];
+            if (SelectedCategory != "") result = result.Where(c => c.Category == SelectedCategory);
+
+            int selectedUser = (int)Session["SelectedUser"];
+            if (selectedUser != 0) result = result.Where(c => c.OwnerId == selectedUser);
+        }
+
+        if ((bool)Session["SortAscending"])
+        {
+            switch ((MediaSortBy)Session["MediaSortBy"])
+            {
+                case MediaSortBy.Title: result = result.OrderBy(c => c.Title); break;
+                case MediaSortBy.PublishDate: result = result.OrderBy(c => c.PublishDate); break;
+                case MediaSortBy.Likes: result = result.OrderBy(c => DB.Likes.ToList().Count(l => l.MediaId == c.Id)); break;
+            }
+        }
+        else
+        {
+            switch ((MediaSortBy)Session["MediaSortBy"])
+            {
+                case MediaSortBy.Title: result = result.OrderByDescending(c => c.Title); break;
+                case MediaSortBy.PublishDate: result = result.OrderByDescending(c => c.PublishDate); break;
+                case MediaSortBy.Likes: result = result.OrderByDescending(c => DB.Likes.ToList().Count(l => l.MediaId == c.Id)); break;
+            }
+        }
+
+        int count = result.Count();
+        if (count < nbItems + index)
+        {
+            nbItems = count - index;
+            Session["EndOfMedias"] = true;
+        }
+        if (nbItems < 0) nbItems = 0;
+
+        return result.Skip(index).Take(nbItems);
+    }
+
+    public ActionResult SetFirstPageSize(int pageSize)
+    {
+        Session["firstPageSize"] = pageSize;
+        return null;
+    }
+
+    public ActionResult getNextMediasPage()
+    {
+        bool EndOfMedias = (bool)Session["EndOfMedias"];
+        if (!EndOfMedias)
+        {
+            Session["pageNum"] = (int)Session["pageNum"] + 1;
+            int pageNum = (int)Session["pageNum"];
+            int pageSize = (int)Session["pageSize"];
+            int firstPageSize = (int)Session["firstPageSize"];
+
+            int index = pageNum == 1 ? 0 : (pageNum - 2) * pageSize + firstPageSize;
+            int nbItems = pageNum == 1 ? firstPageSize : pageSize;
+
+            IEnumerable<Media> mediasPage = _getItems(index, nbItems);
+            return PartialView("GetMedias", mediasPage);
+        }
+        return null;
+    }
+
+    public ActionResult EndOfMedias()
+    {
+        return Json((bool)Session["EndOfMedias"], JsonRequestBehavior.AllowGet);
+    }
+
+    public ActionResult GetMedias(bool forceRefresh = false)
+    {
+        try
+        {
+            if (forceRefresh || DB.Users.HasChanged || DB.Medias.HasChanged || DB.Likes.HasChanged)
+            {
+                ResetMediasPaging();
+                int firstPageSize = (int)Session["firstPageSize"];
+                var items = _getItems(0, firstPageSize);
+                return PartialView(items);
+            }
+            return null;
+        }
+        catch (System.Exception ex) { return Content("Erreur interne" + ex.Message, "text/html"); }
+    }
+
     public ActionResult GetMediasCategoriesList(bool forceRefresh = false)
     {
         try
         {
             InitSessionVariables();
-
             bool search = (bool)Session["Search"];
-
-            if (search)
-            {
-                return PartialView();
-            }
+            if (search) return PartialView();
             return null;
         }
-        catch (System.Exception ex)
-        {
-            return Content("Erreur interne" + ex.Message, "text/html");
-        }
+        catch (System.Exception ex) { return Content("Erreur interne" + ex.Message, "text/html"); }
     }
-    // This action produce a partial view of Medias
-    // It is meant to be called by an AJAX request (from client script)
+
     public ActionResult GetMediaDetails(bool forceRefresh = false)
     {
         try
@@ -75,84 +173,34 @@ public class MediasController : Controller
             int mediaId = Session["CurrentMediaId"] != null ? (int)Session["CurrentMediaId"] : 0;
             Media Media = DB.Medias.Get(mediaId);
 
-            if (DB.Users.HasChanged || DB.Medias.HasChanged || DB.Likes.HasChanged || DB.Comments.HasChanged || forceRefresh)
+            if (DB.Users.HasChanged || DB.Medias.HasChanged || DB.Likes.HasChanged || forceRefresh)
             {
                 return PartialView("GetMediaDetails", Media);
             }
             return null;
         }
-        catch (System.Exception ex)
-        {
-            return Content("Erreur interne" + ex.Message, "text/html");
-        }
-    }
-    public ActionResult GetMedias(bool forceRefresh = false)
-    {
-        try
-        {
-            IEnumerable<Media> result = null;
-            if (DB.Users.HasChanged || DB.Medias.HasChanged || DB.Likes.HasChanged || DB.Comments.HasChanged || forceRefresh)
-            {
-                InitSessionVariables();
-                bool search = (bool)Session["Search"];
-                string searchString = (string)Session["SearchString"];
-
-                if (Models.User.ConnectedUser.IsAdmin) result = DB.Medias.ToList();
-                else result = DB.Medias.ToList().Where(c => c.Shared || Models.User.ConnectedUser.Id == c.OwnerId);
-
-                if (search)
-                {
-                    result = result.Where(c => c.Title.ToLower().Contains(searchString)).OrderBy(c => c.Title);
-
-                    string SelectedCategory = (string)Session["SelectedCategory"];
-                    if (SelectedCategory != "") result = result.Where(c => c.Category == SelectedCategory);
-
-                    int selectedUser = (int)Session["SelectedUser"];
-                    if (selectedUser != 0) result = result.Where(c => c.OwnerId == selectedUser);
-                }
-
-                if ((bool)Session["SortAscending"])
-                {
-                    switch ((MediaSortBy)Session["MediaSortBy"])
-                    {
-                        case MediaSortBy.Title: result = result.OrderBy(c => c.Title); break;
-                        case MediaSortBy.PublishDate: result = result.OrderBy(c => c.PublishDate); break;
-                        case MediaSortBy.Likes: result = result.OrderBy(c => DB.Likes.ToList().Count(l => l.MediaId == c.Id)); break;
-                        case MediaSortBy.Comments: result = result.OrderBy(c => DB.Comments.ToList().Count(com => com.MediaId == c.Id)); break;
-                    }
-                }
-                else
-                {
-                    switch ((MediaSortBy)Session["MediaSortBy"])
-                    {
-                        case MediaSortBy.Title: result = result.OrderByDescending(c => c.Title); break;
-                        case MediaSortBy.PublishDate: result = result.OrderByDescending(c => c.PublishDate); break;
-                        case MediaSortBy.Likes: result = result.OrderByDescending(c => DB.Likes.ToList().Count(l => l.MediaId == c.Id)); break;
-                        case MediaSortBy.Comments: result = result.OrderByDescending(c => DB.Comments.ToList().Count(com => com.MediaId == c.Id)); break;
-                    }
-                }
-                return PartialView(result);
-            }
-            return null;
-        }
         catch (System.Exception ex) { return Content("Erreur interne" + ex.Message, "text/html"); }
     }
+
     public ActionResult List()
     {
         ResetCurrentMediaInfo();
         return View();
     }
+
     public ActionResult ToggleSearch()
     {
         if (Session["Search"] == null) Session["Search"] = false;
         Session["Search"] = !(bool)Session["Search"];
         return RedirectToAction("List");
     }
+
     public ActionResult SetMediaSortBy(MediaSortBy mediaSortBy)
-    {      // /Medias/SetMediasSortBy?mediaSortBy= 
+    {
         Session["MediaSortBy"] = mediaSortBy;
         return RedirectToAction("List");
     }
+
     public ActionResult ToggleMediaSort()
     {
         InitSessionVariables();
@@ -160,16 +208,17 @@ public class MediasController : Controller
 
         if (currentSort == MediaSortBy.Title) Session["MediaSortBy"] = MediaSortBy.PublishDate;
         else if (currentSort == MediaSortBy.PublishDate) Session["MediaSortBy"] = MediaSortBy.Likes;
-        else if (currentSort == MediaSortBy.Likes) Session["MediaSortBy"] = MediaSortBy.Comments;
         else Session["MediaSortBy"] = MediaSortBy.Title;
 
         return RedirectToAction("List");
     }
+
     public ActionResult ToggleSort()
     {
         Session["SortAscending"] = !(bool)Session["SortAscending"];
         return RedirectToAction("List");
     }
+
     public ActionResult SetSearchString(string value)
     {
         Session["SearchString"] = value.ToLower();
@@ -181,11 +230,11 @@ public class MediasController : Controller
         Session["SelectedCategory"] = value;
         return RedirectToAction("List");
     }
+
     public ActionResult About()
     {
         return View();
     }
-
 
     public ActionResult Details(int id)
     {
@@ -200,6 +249,7 @@ public class MediasController : Controller
         }
         return RedirectToAction("List");
     }
+
     [UserAccess(Access.Write)]
     public ActionResult Create()
     {
@@ -211,22 +261,20 @@ public class MediasController : Controller
     [ValidateAntiForgeryToken()]
     public ActionResult Create(Media Media, string sharedCB = "off")
     {
-        Media.OwnerId = Models.User.ConnectedUser.Id;
-        Media.Shared = sharedCB == "on";
-        DB.Medias.Add(Media);
-        DB.Events.Add("Create", Media.Title);
-        return RedirectToAction("List");
+        if (Media.IsValid()) // Validation côté serveur (Phase B)
+        {
+            Media.OwnerId = Models.User.ConnectedUser.Id;
+            Media.Shared = sharedCB == "on";
+            DB.Medias.Add(Media);
+            DB.Events.Add("Create", Media.Title);
+            return RedirectToAction("List");
+        }
+        return View(Media);
     }
 
     [UserAccess(Access.Write)]
     public ActionResult Edit()
     {
-        // Note that id is not provided has a parameter.
-        // It use the Session["CurrentMediaId"] set within
-        // Details(int id) action
-        // This way we prevent from malicious requests that could
-        // modify or delete programatically the all the Medias
-
         int id = Session["CurrentMediaId"] != null ? (int)Session["CurrentMediaId"] : 0;
         if (id != 0)
         {
@@ -245,24 +293,22 @@ public class MediasController : Controller
     [ValidateAntiForgeryToken()]
     public ActionResult Edit(Media Media, string sharedCB = "off")
     {
-        // Has explained earlier, id of Media is stored server side an not provided in form data
-        // passed in the method in order to prever from malicious requests
-
-        int id = Session["CurrentMediaId"] != null ? (int)Session["CurrentMediaId"] : 0;
-
-        // Make sure that the Media of id really exist
-        Media storedMedia = DB.Medias.Get(id);
-        if (storedMedia != null)
+        if (Media.IsValid()) // Validation côté serveur (Phase B)
         {
-            Media.Id = id; // patch the Id
-            Media.Shared = sharedCB == "on";
-            Media.OwnerId = storedMedia.OwnerId;
-            Media.PublishDate = storedMedia.PublishDate; // keep orignal PublishDate
-            DB.Medias.Update(Media);
+            int id = Session["CurrentMediaId"] != null ? (int)Session["CurrentMediaId"] : 0;
+            Media storedMedia = DB.Medias.Get(id);
+            if (storedMedia != null)
+            {
+                Media.Id = id;
+                Media.Shared = sharedCB == "on";
+                Media.OwnerId = storedMedia.OwnerId;
+                Media.PublishDate = storedMedia.PublishDate;
+                DB.Medias.Update(Media);
+            }
+            return RedirectToAction("Details/" + id);
         }
-        return RedirectToAction("Details/" + id);
+        return View(Media);
     }
-
 
     [UserAccess(Access.Write)]
     public ActionResult Delete()
@@ -285,16 +331,11 @@ public class MediasController : Controller
         return Redirect("/Accounts/Login?message=Accès illégal! &success=false");
     }
 
-    // This action is meant to be called by an AJAX request
-    // Return true if there is a name conflict
-    // Look into validation.js for more details
-    // and also into Views/Medias/MediaForm.cshtml
     public JsonResult CheckConflict(string YoutubeId)
     {
         int id = Session["CurrentMediaId"] != null ? (int)Session["CurrentMediaId"] : 0;
-        // Response json value true if name is used in other Medias than the current Media
         return Json(DB.Medias.ToList().Where(c => c.YoutubeId == YoutubeId && c.Id != id).Any(),
-                    JsonRequestBehavior.AllowGet /* must have for CORS verification by client browser */);
+                    JsonRequestBehavior.AllowGet);
     }
 
     [UserAccess(Access.View)]
@@ -304,51 +345,6 @@ public class MediasController : Controller
         var existingLike = DB.Likes.ToList().FirstOrDefault(l => l.UserId == userId && l.MediaId == mediaId);
         if (existingLike != null) DB.Likes.Delete(existingLike.Id);
         else DB.Likes.Add(new Like { UserId = userId, MediaId = mediaId });
-        return null;
-    }
-
-    [HttpPost]
-    [UserAccess(Access.View)]
-    public ActionResult AddComment(int mediaId, string text, int parentId = 0)
-    {
-        DB.Comments.Add(new Comment { MediaId = mediaId, UserId = Models.User.ConnectedUser.Id, Text = text, CreationDate = DateTime.Now, ParentId = parentId });
-        return null;
-    }
-
-    [HttpPost]
-    [UserAccess(Access.View)]
-    public ActionResult EditComment(int id, string text)
-    {
-        var comment = DB.Comments.Get(id);
-        if (comment != null && (comment.UserId == Models.User.ConnectedUser.Id || Models.User.ConnectedUser.IsAdmin))
-        {
-            comment.Text = text;
-            DB.Comments.Update(comment);
-        }
-        return null;
-    }
-
-    [UserAccess(Access.View)]
-    public ActionResult DeleteComment(int id)
-    {
-        var comment = DB.Comments.Get(id);
-        if (comment != null && (comment.UserId == Models.User.ConnectedUser.Id || Models.User.ConnectedUser.IsAdmin))
-        {
-            DB.CommentLikes.DeleteCommentLikes(id);
-            var replies = DB.Comments.ToList().Where(c => c.ParentId == id).ToList();
-            foreach (var reply in replies) { DB.CommentLikes.DeleteCommentLikes(reply.Id); DB.Comments.Delete(reply.Id); }
-            DB.Comments.Delete(id);
-        }
-        return null;
-    }
-
-    [UserAccess(Access.View)]
-    public ActionResult ToggleCommentLike(int commentId)
-    {
-        int userId = Models.User.ConnectedUser.Id;
-        var existing = DB.CommentLikes.ToList().FirstOrDefault(l => l.UserId == userId && l.CommentId == commentId);
-        if (existing != null) DB.CommentLikes.Delete(existing.Id);
-        else DB.CommentLikes.Add(new CommentLike { UserId = userId, CommentId = commentId });
         return null;
     }
 

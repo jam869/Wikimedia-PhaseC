@@ -122,10 +122,6 @@
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
-    <Compile Include="Models\Comment.cs" />
-    <Compile Include="Models\CommentLike.cs" />
-    <Compile Include="Models\CommentLikesRepository.cs" />
-    <Compile Include="Models\CommentsRepository.cs" />
     <Compile Include="Models\EmailView.cs" />
     <Compile Include="Models\Event.cs" />
     <Compile Include="Models\EventsRepository.cs" />

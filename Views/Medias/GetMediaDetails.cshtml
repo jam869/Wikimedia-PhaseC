@@ -12,11 +12,12 @@
         string thumbIcon = userLiked ? "fa-solid fa-thumbs-up" : "fa-regular fa-thumbs-up";
         string likedBy = string.Join("\n", likes.Select(l => DAL.DB.Users.Get(l.UserId).Name));
 
-        <div style="font-size: 1.2em; margin-bottom: 10px; text-align: right;">
-            <span title="@likedBy" style="cursor:help; font-weight:bold;">@likes.Count</span>
-            <i class="@thumbIcon" style="color: #0d6efd; cursor: pointer; margin-left: 5px;" onclick="$.get('/Medias/ToggleLike?mediaId=@Model.Id')"></i>
-        </div>
-
+        <script>
+            $("#headerLikesPanel").html(`
+                <span title="@likedBy" class="like-count" style="cursor:help; font-weight:bold; color: #007BFF; font-size: 1.1em; padding-top: 2px;">@likes.Count</span>
+                <i class="@thumbIcon like-btn" style="color: #007BFF; cursor: pointer; margin-left: 8px; font-size: 1.4em;" onclick="toggleMediaLikeFast(@Model.Id, this)"></i>
+            `);
+        </script>
         <dl>
             <dd>
                 @if ((Models.User.ConnectedUser.Id == Model.OwnerId || Models.User.ConnectedUser.IsAdmin) && Model.Shared)
@@ -24,9 +25,9 @@
                     <span style="color:grey">[Partagé]</span>
                 }
             </dd>
-            <dd>@Model.Title</dd>
+            <dd class="mediaTitle">@Model.Title</dd>
             <dd>@Helper.YoutubePlayer(Model.YoutubeId)</dd>
-            <dd class="description">@Model.Description</dd>
+            <dd class="description mediaDescription">@Model.Description</dd>
             <dt>Catégorie</dt>
             <dd>@Model.Category</dd>
             <dt>Date de publication</dt>
@@ -37,131 +38,29 @@
             </dd>
         </dl>
 
-        <hr />
-
-        <div style="text-align: center; margin-bottom: 20px;">
-            <i class="fa-solid fa-message" style="color: #0d6efd; font-size: 2.5em; cursor: pointer;" onclick="$('#commentSection').toggle()"></i>
-            <br>
-            <i class="fa-solid fa-circle-info" style="color: gray; font-size: 1.2em; cursor: pointer; margin-top:5px;" onclick="$('#commentHelp').toggle()"></i>
-            <div id="commentHelp" style="display:none; background-color:#f8f9fa; padding:10px; border-radius:5px; margin-top:10px; border:1px solid #ddd; text-align:left; font-size:0.9em;">
-                <strong>Aide:</strong> Cliquez sur la bulle bleue pour afficher ou masquer les commentaires. Utilisez le crochet pour envoyer et le X pour annuler. Vous pouvez aimer (pouce noir), modifier (crayon), répondre (bulle) ou effacer (corbeille) un message.
-            </div>
-        </div>
-
-        <div id="commentSection" style="display:none;">
-            <div style="display:flex; align-items:center; margin-bottom: 20px; background-color:#f1f1f1; padding:10px; border-radius:10px;">
-                <input type="text" id="newCommentText" class="form-control" placeholder="Ajouter un commentaire..." style="flex-grow:1;" />
-                <i class="fa-solid fa-check" style="cursor:pointer; color:black; font-size:1.5em; margin-left:15px;" onclick="addComment(@Model.Id, 0, '#newCommentText')"></i>
-                <i class="fa-solid fa-xmark" style="cursor:pointer; color:black; font-size:1.5em; margin-left:10px;" onclick="$('#newCommentText').val('')"></i>
-            </div>
-
-            @{
-                var allComments = DAL.DB.Comments.ToList().Where(c => c.MediaId == Model.Id).ToList();
-                var mainComments = allComments.Where(c => c.ParentId == 0).OrderBy(c => c.CreationDate).ToList();
-            }
-
-            @foreach (var comment in mainComments)
-            {
-                var user = DAL.DB.Users.Get(comment.UserId);
-                var commentLikes = DAL.DB.CommentLikes.ToList().Where(l => l.CommentId == comment.Id).ToList();
-                bool cLiked = commentLikes.Any(l => l.UserId == connectedId);
-                string cThumb = cLiked ? "fa-solid" : "fa-regular";
-
-                <div style="padding: 10px 0; display:flex;">
-                    <div style="margin-right: 15px;">@Helper.AvatarUser(user)</div>
-                    <div style="flex-grow: 1;">
-                        <strong>@user.Name</strong> <span style="color:gray; font-size: 0.8em;">@Helper.When(comment.CreationDate)</span>
-                        <p id="txt_@comment.Id" style="margin: 5px 0;">@comment.Text</p>
-
-                        <div style="color:black; font-size:1.1em; display:flex; gap:15px; align-items:center;">
-                            <span style="font-size:0.8em;">@commentLikes.Count</span>
-                            <i class="@cThumb fa-thumbs-up c-like-btn" style="cursor:pointer;" onclick="toggleCommentLikeFast(@comment.Id, this)"></i>
-                            <i class="fa-solid fa-reply" style="cursor:pointer;" onclick="$('#replyBox_@comment.Id').toggle()"></i>
-                            @if (comment.UserId == connectedId || Models.User.ConnectedUser.IsAdmin)
-                            {
-                                <i class="fa-solid fa-pen" style="cursor:pointer;" onclick="showEditBox(@comment.Id)"></i>
-                            }
-                        </div>
-
-                        <div id="replyBox_@comment.Id" style="display:none; align-items:center; margin-top: 10px; background-color:#f8f9fa; padding:5px; border-radius:5px;">
-                            <input type="text" id="replyInput_@comment.Id" class="form-control form-control-sm" placeholder="Répondre..." style="flex-grow:1;" />
-                            <i class="fa-solid fa-check" style="cursor:pointer; color:black; margin-left:10px;" onclick="addComment(@Model.Id, @comment.Id, '#replyInput_@comment.Id')"></i>
-                            <i class="fa-solid fa-xmark" style="cursor:pointer; color:black; margin-left:10px;" onclick="$('#replyBox_@comment.Id').toggle()"></i>
-                        </div>
-
-                        <div id="editBox_@comment.Id" style="display:none; align-items:center; margin-top: 10px; background-color:#fff3cd; padding:5px; border-radius:5px;">
-                            <input type="text" id="editInput_@comment.Id" class="form-control form-control-sm" value="@comment.Text" style="flex-grow:1;" />
-                            <i class="fa-solid fa-check" style="cursor:pointer; color:black; margin-left:10px;" onclick="editComment(@comment.Id)"></i>
-                            <i class="fa-solid fa-xmark" style="cursor:pointer; color:black; margin-left:10px;" onclick="$('#editBox_@comment.Id').toggle(); $('#txt_@comment.Id').show();"></i>
-                            <i class="fa-solid fa-trash" style="cursor:pointer; color:black; margin-left:10px;" onclick="$.get('/Medias/DeleteComment?id=@comment.Id')"></i>
-                        </div>
-
-                        @{ var replies = allComments.Where(r => r.ParentId == comment.Id).OrderBy(r => r.CreationDate).ToList(); }
-                        @foreach (var reply in replies)
-                        {
-                            var rUser = DAL.DB.Users.Get(reply.UserId);
-                            var rLikes = DAL.DB.CommentLikes.ToList().Where(l => l.CommentId == reply.Id).ToList();
-                            bool rLiked = rLikes.Any(l => l.UserId == connectedId);
-                            string rThumb = rLiked ? "fa-solid" : "fa-regular";
-
-                            <div style="display:flex; margin-top: 15px; margin-left: 40px; border-left: 2px solid #ccc; padding-left: 10px;">
-                                <div style="margin-right: 10px;">@Helper.AvatarUser(rUser)</div>
-                                <div style="flex-grow: 1;">
-                                    <strong>@rUser.Name</strong> <span style="color:gray; font-size: 0.8em;">@Helper.When(reply.CreationDate)</span>
-                                    <p id="txt_@reply.Id" style="margin: 3px 0;">@reply.Text</p>
-
-                                    <div style="color:black; font-size:1em; display:flex; gap:15px; align-items:center;">
-                                        <span style="font-size:0.8em;">@rLikes.Count</span>
-                                        <i class="@rThumb fa-thumbs-up c-like-btn" style="cursor:pointer;" onclick="toggleCommentLikeFast(@reply.Id, this)"></i>
-                                        @if (reply.UserId == connectedId || Models.User.ConnectedUser.IsAdmin)
-                                        {
-                                            <i class="fa-solid fa-pen" style="cursor:pointer;" onclick="showEditBox(@reply.Id)"></i>
-                                        }
-                                    </div>
-
-                                    <div id="editBox_@reply.Id" style="display:none; align-items:center; margin-top: 5px; background-color:#fff3cd; padding:5px; border-radius:5px;">
-                                        <input type="text" id="editInput_@reply.Id" class="form-control form-control-sm" value="@reply.Text" style="flex-grow:1;" />
-                                        <i class="fa-solid fa-check" style="cursor:pointer; color:black; margin-left:10px;" onclick="editComment(@reply.Id)"></i>
-                                        <i class="fa-solid fa-xmark" style="cursor:pointer; color:black; margin-left:10px;" onclick="$('#editBox_@reply.Id').toggle(); $('#txt_@reply.Id').show();"></i>
-                                        <i class="fa-solid fa-trash" style="cursor:pointer; color:black; margin-left:10px;" onclick="$.get('/Medias/DeleteComment?id=@reply.Id')"></i>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    </div>
-                </div>
-                            }
-        </div>
-
         <script>
-            function toggleCommentLikeFast(commentId, btn) {
+            function toggleMediaLikeFast(mediaId, btn) {
                 let $icon = $(btn);
+                let $countSpan = $icon.prev('.like-count');
+                let count = parseInt($countSpan.text());
+
                 if ($icon.hasClass('fa-regular')) {
                     $icon.removeClass('fa-regular').addClass('fa-solid');
+                    $countSpan.text(count + 1);
                 } else {
                     $icon.removeClass('fa-solid').addClass('fa-regular');
+                    $countSpan.text(count - 1);
                 }
-                $.get('/Medias/ToggleCommentLike?commentId=' + commentId);
-            }
-
-            function addComment(mediaId, parentId, inputSelector) {
-                let text = $(inputSelector).val();
-                if (text.trim() !== "") {
-                    $.post('/Medias/AddComment', { mediaId: mediaId, text: text, parentId: parentId });
-                }
-            }
-
-            function showEditBox(commentId) {
-                $('#txt_' + commentId).hide();
-                $('#editBox_' + commentId).css('display', 'flex');
-            }
-
-            function editComment(commentId) {
-                let text = $('#editInput_' + commentId).val();
-                if (text.trim() !== "") {
-                    $.post('/Medias/EditComment', { id: commentId, text: text });
-                }
+                $.get('/Medias/ToggleLike?mediaId=' + mediaId);
             }
         </script>
-                                }
-                            }
+    }
+    else
+    {
+        <h2 style="color:red">Cette vidéo n'est plus partagée...</h2>
+    }
+}
+else
+{
+    <h2 style="color:red">Cette vidéo a été effacée...</h2>
+}
