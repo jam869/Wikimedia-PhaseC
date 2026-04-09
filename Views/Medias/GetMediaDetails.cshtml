@@ -64,3 +64,18 @@ else
 {
     <h2 style="color:red">Cette vidéo a été effacée...</h2>
 }
+@{
+    string searchString = Session["SearchString"] != null ? (string)Session["SearchString"] : "";
+    bool isSearchActive = Session["Search"] != null ? (bool)Session["Search"] : false;
+}
+@if (isSearchActive && !string.IsNullOrEmpty(searchString))
+{
+    <script>
+                // On attend un tout petit peu pour s'assurer que le HTML est rendu
+                setTimeout(() => {
+                    let searchStr = "@searchString";
+                    $(".mediaTitle").each(function () { highlight(searchStr, this); });
+                    $(".mediaDescription").each(function () { highlight(searchStr, this); });
+                }, 50);
+    </script>
+}
