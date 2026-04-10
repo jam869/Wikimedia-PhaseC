@@ -7,17 +7,6 @@
 
     if (isVisible)
     {
-        var likes = DAL.DB.Likes.ToList().Where(l => l.MediaId == Model.Id).ToList();
-        bool userLiked = likes.Any(l => l.UserId == connectedId);
-        string thumbIcon = userLiked ? "fa-solid fa-thumbs-up" : "fa-regular fa-thumbs-up";
-        string likedBy = string.Join("\n", likes.Select(l => DAL.DB.Users.Get(l.UserId).Name));
-
-        <script>
-            $("#headerLikesPanel").html(`
-                <span title="@likedBy" class="like-count" style="cursor:help; font-weight:bold; color: #007BFF; font-size: 1.1em; padding-top: 2px;">@likes.Count</span>
-                <i class="@thumbIcon like-btn" style="color: #007BFF; cursor: pointer; margin-left: 8px; font-size: 1.4em;" onclick="toggleMediaLikeFast(@Model.Id, this)"></i>
-            `);
-        </script>
         <dl>
             <dd>
                 @if ((Models.User.ConnectedUser.Id == Model.OwnerId || Models.User.ConnectedUser.IsAdmin) && Model.Shared)
@@ -37,23 +26,6 @@
                 @Helper.AvatarUser(Model.Owner)
             </dd>
         </dl>
-
-        <script>
-            function toggleMediaLikeFast(mediaId, btn) {
-                let $icon = $(btn);
-                let $countSpan = $icon.prev('.like-count');
-                let count = parseInt($countSpan.text());
-
-                if ($icon.hasClass('fa-regular')) {
-                    $icon.removeClass('fa-regular').addClass('fa-solid');
-                    $countSpan.text(count + 1);
-                } else {
-                    $icon.removeClass('fa-solid').addClass('fa-regular');
-                    $countSpan.text(count - 1);
-                }
-                $.get('/Medias/ToggleLike?mediaId=' + mediaId);
-            }
-        </script>
     }
     else
     {
@@ -63,19 +35,4 @@
 else
 {
     <h2 style="color:red">Cette vidéo a été effacée...</h2>
-}
-@{
-    string searchString = Session["SearchString"] != null ? (string)Session["SearchString"] : "";
-    bool isSearchActive = Session["Search"] != null ? (bool)Session["Search"] : false;
-}
-@if (isSearchActive && !string.IsNullOrEmpty(searchString))
-{
-    <script>
-                // On attend un tout petit peu pour s'assurer que le HTML est rendu
-                setTimeout(() => {
-                    let searchStr = "@searchString";
-                    $(".mediaTitle").each(function () { highlight(searchStr, this); });
-                    $(".mediaDescription").each(function () { highlight(searchStr, this); });
-                }, 50);
-    </script>
 }

@@ -1,25 +1,24 @@
 ﻿@model Models.Media
 @{
     ViewBag.PageTitle = "Détails";
-
     string searchString = Session["SearchString"] != null ? (string)Session["SearchString"] : "";
     bool isSearchActive = Session["Search"] != null ? (bool)Session["Search"] : false;
 }
 
 <div id="detailsPanel" class="detailsPanel">
+    @Html.Partial("GetMediaDetails", Model)
 </div>
 
 @section Scripts {
     <script>
-        let mediaDetails_ARP;
+        let likes_ARP;
 
         $(() => {
             newSession(600);
-            mediaDetails_ARP = new AutoRefreshedPanel("detailsPanel", "/Medias/GetMediaDetails", 5, mediaDetailsPostRefresh);
             sessionStorage.setItem("WasInDetails", "1");
-        });
 
-        function mediaDetailsPostRefresh() {
+            likes_ARP = new AutoRefreshedPanel("headerLikesPanel", "/Medias/GetMediaLikes", 5, null);
+
             let isSearchActive = "@isSearchActive" === "True";
             let searchStr = "@searchString";
 
@@ -29,6 +28,6 @@
                     $(".mediaDescription").each(function () { highlight(searchStr, this); });
                 }
             }
-        }
+        });
     </script>
 }

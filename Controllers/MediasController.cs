@@ -159,7 +159,11 @@ public class MediasController : Controller
         {
             InitSessionVariables();
             bool search = (bool)Session["Search"];
-            if (search) return PartialView();
+
+            if (search && (DB.Medias.HasChanged || forceRefresh))
+            {
+                return PartialView();
+            }
             return null;
         }
         catch (System.Exception ex) { return Content("Erreur interne" + ex.Message, "text/html"); }
@@ -348,17 +352,40 @@ public class MediasController : Controller
         return null;
     }
 
-    public ActionResult GetMediasUsersList()
+    public ActionResult GetMediasUsersList(bool forceRefresh = false)
     {
         InitSessionVariables();
-        var userIds = DB.Medias.ToList().Select(m => m.OwnerId).Distinct();
-        var users = DB.Users.ToList().Where(u => userIds.Contains(u.Id)).OrderBy(u => u.Name).ToList();
-        return PartialView(users);
+        bool search = (bool)Session["Search"];
+
+            if (search && (DB.Medias.HasChanged || DB.Users.HasChanged || forceRefresh))
+        {
+            var userIds = DB.Medias.ToList().Select(m => m.OwnerId).Distinct();
+            var users = DB.Users.ToList().Where(u => userIds.Contains(u.Id)).OrderBy(u => u.Name).ToList();
+            return PartialView(users);
+        }
+        return null;
     }
 
     public ActionResult SetSearchUser(int value)
     {
         Session["SelectedUser"] = value;
         return RedirectToAction("List");
+    }
+
+    public ActionResult GetMediaLikes(bool forceRefresh = false)
+    {
+        try
+        {
+            InitSessionVariables();
+            int mediaId = Session["CurrentMediaId"] != null ? (int)Session["CurrentMediaId"] : 0;
+            Media Media = DB.Medias.Get(mediaId);
+
+            if (DB.Likes.HasChanged || forceRefresh)
+            {
+                return PartialView(Media);
+            }
+            return null;
+        }
+        catch (System.Exception ex) { return Content("Erreur interne" + ex.Message, "text/html"); }
     }
 }

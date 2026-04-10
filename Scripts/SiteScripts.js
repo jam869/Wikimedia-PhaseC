@@ -128,3 +128,19 @@ function highlight(text, elem) {
     }
 }
 
+
+function toggleMediaLikeFast(mediaId, btn) {
+    let $icon = $(btn);
+    let $countSpan = $icon.prev('.like-count');
+    let count = parseInt($countSpan.text());
+
+    if ($icon.hasClass('fa-regular')) {
+        $icon.removeClass('fa-regular').addClass('fa-solid');
+        $countSpan.text(count + 1);
+    } else {
+        $icon.removeClass('fa-solid').addClass('fa-regular');
+        $countSpan.text(count - 1);
+    }
+
+    $.get('/Medias/ToggleLike?mediaId=' + mediaId);
+}
