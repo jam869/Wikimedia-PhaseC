@@ -2,7 +2,6 @@
 @{
     ViewBag.PageTitle = "Détails";
 
-    // On récupère les infos de recherche pour la surbrillance
     string searchString = Session["SearchString"] != null ? (string)Session["SearchString"] : "";
     bool isSearchActive = Session["Search"] != null ? (bool)Session["Search"] : false;
 }
@@ -21,12 +20,10 @@
         });
 
         function mediaDetailsPostRefresh() {
-            // Appliquer la surbrillance si une recherche est active
             let isSearchActive = "@isSearchActive" === "True";
             let searchStr = "@searchString";
 
             if (isSearchActive && searchStr.length >= 3) {
-                // On vérifie que la fonction existe (au cas où)
                 if (typeof highlight === "function") {
                     $(".mediaTitle").each(function () { highlight(searchStr, this); });
                     $(".mediaDescription").each(function () { highlight(searchStr, this); });
