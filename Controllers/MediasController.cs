@@ -177,6 +177,11 @@ public class MediasController : Controller
             int mediaId = Session["CurrentMediaId"] != null ? (int)Session["CurrentMediaId"] : 0;
             Media Media = DB.Medias.Get(mediaId);
 
+            if (Media == null)
+            {
+                return Content("<script>window.location.href = '/Medias/List';</script>");
+            }
+
             if (DB.Users.HasChanged || DB.Medias.HasChanged || DB.Likes.HasChanged || forceRefresh)
             {
                 return PartialView("GetMediaDetails", Media);
@@ -185,7 +190,6 @@ public class MediasController : Controller
         }
         catch (System.Exception ex) { return Content("Erreur interne" + ex.Message, "text/html"); }
     }
-
     public ActionResult List()
     {
         ResetCurrentMediaInfo();
