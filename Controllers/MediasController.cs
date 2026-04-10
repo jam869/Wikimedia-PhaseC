@@ -364,10 +364,23 @@ public class MediasController : Controller
         InitSessionVariables();
         bool search = (bool)Session["Search"];
 
-            if (search && (DB.Medias.HasChanged || DB.Users.HasChanged || forceRefresh))
+        if (search && (DB.Medias.HasChanged || DB.Users.HasChanged || forceRefresh))
         {
-            var userIds = DB.Medias.ToList().Select(m => m.OwnerId).Distinct();
+            IEnumerable<Media> visibleMedias;
+
+            if (Models.User.ConnectedUser.IsAdmin)
+            {
+                visibleMedias = DB.Medias.ToList();
+            }
+            else
+            {
+                visibleMedias = DB.Medias.ToList().Where(c => c.Shared || Models.User.ConnectedUser.Id == c.OwnerId);
+            }
+
+            var userIds = visibleMedias.Select(m => m.OwnerId).Distinct();
+
             var users = DB.Users.ToList().Where(u => userIds.Contains(u.Id)).OrderBy(u => u.Name).ToList();
+
             return PartialView(users);
         }
         return null;
