@@ -8,30 +8,32 @@
 <div id="detailsPanel" class="detailsPanel">
     @Html.Partial("GetMediaDetails", Model)
 </div>
-
 @section Scripts {
     <script>
         let likes_ARP;
-        let details_ARP; 
+        let details_ARP;
 
         $(() => {
             newSession(600);
             sessionStorage.setItem("WasInDetails", "1");
 
-            likes_ARP = new AutoRefreshedPanel("headerLikesPanel", "/Medias/GetMediaLikes", 5, null);
-
-          
-            details_ARP = new AutoRefreshedPanel("detailsPanel", "/Medias/GetMediaDetails", 5, null);
-
             let isSearchActive = "@isSearchActive" === "True";
             let searchStr = "@searchString";
 
-            if (isSearchActive && searchStr.length >= 3) {
-                if (typeof highlight === "function") {
-                    $(".mediaTitle").each(function () { highlight(searchStr, this); });
-                    $(".mediaDescription").each(function () { highlight(searchStr, this); });
+            function applyHighlights() {
+                if (isSearchActive && searchStr.length >= 3) {
+                    if (typeof highlight === "function") {
+                        $(".mediaTitle").each(function () { highlight(searchStr, this); });
+                        $(".mediaDescription").each(function () { highlight(searchStr, this); });
+                    }
                 }
             }
+
+            likes_ARP = new AutoRefreshedPanel("headerLikesPanel", "/Medias/GetMediaLikes", 5, null);
+
+            details_ARP = new AutoRefreshedPanel("detailsPanel", "/Medias/GetMediaDetails", 5, applyHighlights);
+
+            applyHighlights();
         });
     </script>
 }

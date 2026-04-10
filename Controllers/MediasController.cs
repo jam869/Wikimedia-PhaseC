@@ -296,18 +296,21 @@ public class MediasController : Controller
         return Redirect("/Accounts/Login?message=Accès illégal! &success=false");
     }
 
-    [UserAccess(Access.Write)]
     [HttpPost]
     [ValidateAntiForgeryToken()]
+    [UserAccess(Access.Write)]
+   
     public ActionResult Edit(Media Media, string sharedCB = "off")
     {
-        if (Media.IsValid()) // Validation côté serveur (Phase B)
+        int id = Session["CurrentMediaId"] != null ? (int)Session["CurrentMediaId"] : 0;
+
+        Media.Id = id;
+
+        if (Media.IsValid())
         {
-            int id = Session["CurrentMediaId"] != null ? (int)Session["CurrentMediaId"] : 0;
             Media storedMedia = DB.Medias.Get(id);
             if (storedMedia != null)
             {
-                Media.Id = id;
                 Media.Shared = sharedCB == "on";
                 Media.OwnerId = storedMedia.OwnerId;
                 Media.PublishDate = storedMedia.PublishDate;
