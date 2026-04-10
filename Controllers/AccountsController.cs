@@ -360,28 +360,32 @@ namespace Controllers
             return null;
         }
         [UserAccess(Access.Admin)]
+        [UserAccess(Access.Admin)]
         public ActionResult DeleteUser(int id)
         {
-
-            if (id != 1)
+            if (id != 1) 
             {
                 User user = DB.Users.Get(id);
                 if (user != null)
                 {
                     DB.Events.Add("DeleteUser " + user.Name);
-                    string message = "Votre compte a été effacé par l'administrateur du site.";
-                    DB.Likes.DeleteUserLikes(user.Id); 
+
+                    DB.Likes.DeleteUserLikes(user.Id);
+
                     var userMedias = DB.Medias.ToList().Where(m => m.OwnerId == user.Id).ToList();
                     foreach (var m in userMedias)
                     {
                         DB.Likes.DeleteMediaLikes(m.Id);
+
                         DB.Medias.Delete(m.Id);
                     }
+
                     DB.Users.Delete(id);
-                    AccountsEmailing.SendEmailUserStatusChanged(message, user);
+
+                    
                 }
             }
-            return null;
+            return null; 
         }
         #region Login journal
         [UserAccess(Access.Admin)]
